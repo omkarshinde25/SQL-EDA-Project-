@@ -1,0 +1,261 @@
+-- Part 1: Basic Exploration
+
+
+-- Q) 1. List all customers from USA.
+select customerName,country from customers where country='usa';
+
+-- Q) 2. Show all products where stock is less than 500 units.
+select * from products where quantityInStock>=500;
+
+-- Q) 3. Find employees working in the Paris office.
+select * from employees where officecode=4;
+
+-- Q) 4. Get orders with status = 'Cancelled'.
+select * from orders where status='cancelled';
+
+-- Q) 5. List all customers whose credit limit > 100000.
+select customername,creditlimit,country from customers where creditlimit > 100000;
+
+-- Q) 6. Find customers who have no assigned sales representative.
+select customerName,salesRepEmployeeNumber from customers where salesrepemployeenumber is null;
+
+-- Q) 7. Show all orders placed in 2004.
+select orderNumber,orderDate,status from orders where year(orderdate)=2004;
+
+
+-- Part 2: Joins Practice
+
+
+-- Q) 8. Show all orders along with the customer name.
+select orderNumber,orderDate,status,customername from orders inner join customers using(customernumber);
+
+-- Q) 9.Show each customer with their sales representative’s name.
+select customername, concat(e.firstname,' ',e.lastname) as SalesRepresentative from customers c left join employees e on  c.salesRepEmployeeNumber=e.employeenumber;
+
+-- Q) 10. Find all employees and the office city they work in.
+select officeCode,firstname,lastname,city from employees left join offices using(officecode);
+
+-- Q) 11. Show each order with its ordered products and quantities.
+select ordernumber,orderdate,productname,quantityordered from orders inner join orderdetails using(ordernumber) inner join products using(productcode) order by ordernumber;
+
+-- Q) 12. List all payments with customer name and country.
+select customerNumber,checkNumber,paymentDate,amount,customerName,country from payments left join customers using(customernumber);
+
+-- Q) 13. Show all customers who have never placed an order.
+select c.customernumber,c.customername from customers c left join orders o on c.customernumber=o.customernumber where o.ordernumber is null;
+
+-- Q) 14. Find employees who don’t manage anyone.
+select e.employeenumber,e.firstname,e.lastname from employees e left join employees sub on e.employeenumber=sub.reportsto where sub.employeenumber is null;
+
+
+--  Part 3: Aggregates & Grouping
+
+
+-- Q) 15. Count how many customers each country has.
+select country,count(country) from customers group by country;
+
+-- Q) 16. Find the total sales amount for each customer.
+select customername,sum(salesRepEmployeeNumber) from customers group by customerName;
+
+-- Q) 17. Show the average credit limit per country.
+select country, avg(creditlimit) as avgcreditlimit from customers group by country order by avgcreditlimit desc;
+
+-- Q) 18. Find the maximum payment amount per customer.
+select customername,max(creditlimit) as maxcreditlimit from customers group by customername order by maxcreditlimit desc;
+
+-- Q) 19. Count the number of products in each product line.
+select productline,count(productline) as countproducts from products group by productline;
+
+-- Q) 20. Find which employee manages the most customers.
+select e.employeenumber,e.firstname,e.lastname,count(customernumber) as totalcustomers from employees e left join customers c on e.employeenumber=c.salesrepemployeenumber group by e.employeenumber,e.firstname,e.lastname order by totalcustomers desc limit 1;
+
+-- Q) 21. Get the monthly sales totals for 2004.
+select year(o.orderdate) as order_year, month(o.orderdate) as order_month,sum(od.quantityOrdered * od.priceEach) as monthly_sales from orders o inner join orderdetails od on o.ordernumber=od.ordernumber where year(o.orderdate)=2004 group by year(o.orderdate),month(o.orderdate) order by order_month;
+
+-- Q) 22. Find the top 5 customers by total payments.
+ select c.customernumber,c.customername,sum(p.amount) as total_p from customers c inner join payments p on c.customernumber=p.customernumber group by c.customernumber,c.customername order by total_p desc limit 5;
+
+
+-- Part 4: Subqueries & Insights
+
+
+-- Q) 23. Find customers who made payments greater than the average payment.
+select c.customernumber,c.customername,p.checknumber,p.paymentdate,p.amount from customers c inner join payments p on c.customernumber=p.customernumber where p.amount > (select avg(amount) from payments) order by p.amount desc;
+
+-- Q) 24. List products that have never been ordered.
+select productcode,productname,productline from products where productcode not in (select productcode from orderdetails);
+
+-- Q) 25. Find the employee with the highest number of direct reports.
+select e.employeenumber,concat(e.firstname," ",e.lastname) as employeename,(select count(*) from customers c where c.salesrepemployeenumber=e.employeenumber) as total_customers from employees e order by total_customers desc limit 1;
+
+-- Q) 26. Show orders that contain the most expensive product.
+select distinct o.ordernumber, o.orderdate, o.status, o.customernumber from orders o inner join orderdetails od on o.ordernumber = od.ordernumber where od.productcode = (select productcode from products order by buyprice desc limit 1);
+
+-- Q) 27. List the top 3 offices with the highest total sales.
+select o.officecode,o.city,o.country,(select sum(od.quantityOrdered * od.priceEach) from employees e inner join customers c on e.employeenumber=c.salesrepemployeenumber inner join orders ord on c.customernumber=ord.customernumber inner join orderdetails od on ord.ordernumber=od.ordernumber where e.officecode=o.officecode) as total_sales from offices o order by total_sales desc limit 3;
+
+
+
+-- Part 5: Stored Procedures
+
+
+
+-- Q) 28. Create a procedure to get all orders by a given customer.
+
+-- use delimiter
+delimiter $
+
+-- Store Procedure IN argument use
+create procedure getordersbycustomers(in cust_id int)
+begin
+select * from orders where customernumber=cust_id order by orderdate desc;
+end$
+
+-- use delimiter 
+delimiter ;
+
+-- call 
+call getordersbycustomers(141);
+
+
+
+-- Q) 29. Create a procedure to find total sales between two dates.
+
+ -- use delimiter
+Delimiter $
+
+-- Store Procedure Two IN argument use
+create procedure GetTotalSalesBetweenDate(in start_date date,in end_date date)
+begin
+select sum(quantityordered*priceeach) as total_sales from orders inner join orderdetails using(ordernumber) where orderdate between start_date and end_date;
+end$
+
+-- use delimiter
+delimiter ;
+
+-- call
+call GetTotalSalesBetweendate('2003-01-01','2003-12-31');
+
+
+
+-- Q) 30. Build a procedure that shows the best-selling product line.
+
+-- use delimeter
+delimiter $
+ 
+-- Store Procedure 
+create procedure best_selling_product_line()
+begin
+select p.productLine, SUM(od.quantityOrdered * od.priceEach) AS total_sales FROM orderdetails od inner join products p ON od.productCode = p.productCode group by p.productLine order by total_sales desc limit 1;
+end$
+
+-- delimiter use
+delimiter ;
+
+-- call
+call best_selling_product_line();
+
+
+
+-- Q) 31. Create a procedure to display all customers handled by an employee
+
+-- use delimeter
+delimiter $
+
+-- Store Procedure 
+create procedure customers_by_employee(in emp_id int)
+begin
+select c.customerNumber, c.customerName, concat(e.firstName, ' ', e.lastName) as salesrep from customers c inner join employees e on c.salesRepEmployeeNumber = e.employeeNumber where e.employeeNumber = emp_id;
+end$
+
+-- delimiter use
+delimiter ;
+
+-- call
+call customers_by_employee(1370);
+
+
+
+-- Q) 32. Write a procedure to calculate yearly revenue given an input year.
+
+-- use delimeter
+delimiter $
+
+-- Store Procedure 
+create procedure yearly_revenue(IN input_year INT)
+begin
+select input_year as year, sum(od.quantityordered * od.priceeach) as total_revenue from orderdetails od inner join orders o on od.ordernumber = o.ordernumber where year(o.orderdate) = input_year;
+end$
+
+-- delimiter use
+delimiter ;
+
+-- call
+call yearly_revenue(2004);
+
+
+
+-- Part 6: Advanced Clauses
+
+
+
+-- Q) 33. Find customers who placed more than 5 orders.
+select customernumber,customername,count(ordernumber) as total_orders from customers inner join orders using(customernumber) group by customernumber, customername having count(ordernumber) >5 order by total_orders desc;
+
+-- Q) 34. List product lines where the average MSRP > 100.
+select productline,avg(msrp) from products group by productline having avg(msrp)>100;
+
+-- Q) 35. Show employees with more than 3 customers assigned.
+select e.employeenumber,concat(e.firstname,' ',e.lastname) as fullname,count(c.customername) as total_cust from employees e inner join customers c on e.employeenumber=c.salesrepemployeenumber group by e.employeenumber,e.firstname,e.lastname having count(c.customernumber)>3 order by total_cust desc;
+
+-- Q) 36. Display orders where the shippedDate is NULL.
+ select ordernumber,orderdate,shippeddate,status from orders where shippeddate is null;
+
+-- Q) 37. Categorize customers by credit limit: High, Medium, Low.
+select customernumber,customername,creditlimit,case when creditlimit>50000 then 'High' when creditlimit>20000 then 'Medium' else 'Low' end as credit_category from customers order by creditlimit desc;
+
+-- Q) 38. Find the top 10 most ordered products.
+select p.productcode,p.productname,sum(od.quantityordered) as total_sales from products p inner join orderdetails od on p.productcode=od.productcode group by productcode,productname order by total_sales desc limit 10;
+
+-- Q) 39. Show the revenue contribution % of each product line.
+SELECT productLine,line_revenue, ROUND(line_revenue / total_revenue * 100, 2) AS revenue_percentage FROM (SELECT p.productLine, SUM(od.quantityOrdered * od.priceEach) AS line_revenue, (SELECT SUM(quantityOrdered * priceEach) FROM orderdetails) AS total_revenue FROM orderdetails od INNER JOIN products p ON od.productCode = p.productCode GROUP BY p.productLine) AS revenue_data ORDER BY revenue_percentage DESC;
+
+
+
+ Part 7: Business Insights
+
+
+
+-- Q) 40. Which country generates the most revenue.
+select c.country,sum(od.quantityordered * od.priceeach) as total_revenue from customers c inner join orders o on c.customernumber=o.customernumber inner join orderdetails od on o.ordernumber=od.ordernumber group by c.country order by total_revenue desc limit 1;
+
+-- Q) 41. Who are the top 5 sales representatives by payments?
+select e.employeenumber,e.lastname,e.firstname,sum(p.amount) total_payments from employees e inner join customers c on e.employeenumber=c.salesRepEmployeeNumber inner join payments p on c.customernumber=p.customernumber group by e.employeenumber,e.lastname,e.firstname order by total_payments desc limit 5;
+
+-- Q) 42. Which month has the highest number of orders?
+select month(orderdate) as order_month, year(orderdate) order_year, count(ordernumber) as total_orders from orders group by order_year, order_month order by total_orders desc limit 1;
+
+-- Q) 43. What is the average order size (quantity of products per order)?
+select avg(order_size) as avg_order_size from ( select o.ordernumber,sum(od.quantityordered) as order_size from orders o inner join orderdetails od on o.ordernumber=od.ordernumber group by o.ordernumber) as order_summaery;
+
+-- Q) 44. Which product has the highest profit margin (MSRP - buyPrice)?
+select productcode,productname,(msrp - buyprice) as profit_margin from products order by profit_margin desc limit 1;
+
+-- Q) 45. Which office manages the largest number of customers?
+select o.officecode,o.city,count(c.customernumber) as total_customers from offices o inner join employees e on o.officecode=e.officecode inner join customers c on e.employeenumber=c.salesrepemployeenumber group by o.officecode,o.city order by total_customers desc limit 1;
+
+-- Q) 46. Who are the most valuable customers (based on payments)?
+select c.customernumber,c.customername, sum(p.amount) as total_payments from customers c inner join payments p on c.customernumber=p.customernumber group by c.customernumber,c.customername order by total_payments desc limit 5;
+
+-- Q) 47. Find the trend of sales over years.
+select year(o.orderdate) as order_year,sum(od.quantityordered * priceeach) as total_sales from orders o inner join orderdetails od on o.ordernumber=od.ordernumber group by order_year order by order_year;
+
+-- Q) 48. Which product line has highest stock but lowest sale.
+select p.productline,sum(p.quantityinstock) as total_stock, sum(od.quantityordered) as total_sold from products p left join orderdetails od on p.productcode=od.productcode group by p.productline order by total_stock desc,total_sold asc limit 1;
+
+-- Q) 49. Detect customers with zero payments.
+select c.customernumber,c.customername from customers c left join payments p on c.customernumber=p.customernumber where p.customernumber is null;
+
+-- Q) 50. Find the slowest-moving products (very few orders).
+select p.productcode,p.productname,ifnull(sum(od.quantityordered),0) as total_sold from products p left join orderdetails od on p.productcode = od.productcode group by p.productCode, p.productName order by total_sold asc limit 5;
+
